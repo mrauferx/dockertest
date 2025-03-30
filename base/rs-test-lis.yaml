@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rs-test-lis
+  labels:
+    app: rs-test-lis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rs-test-lis
+  template:
+    metadata:
+      labels:
+        app: rs-test-lis
+    spec:
+      containers:
+      - name: rs-test-lis
+        image: harbor.localdomain/mytest/rs-test:lis.5
+        imagePullPolicy: IfNotPresent
+      imagePullSecrets:
+      - name: harbor

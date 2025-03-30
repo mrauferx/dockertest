@@ -1,0 +1,40 @@
+####### This is a multi-stage build ######
+####### Below is for building app ########
+FROM node:14.17.5 as installer
+COPY ./nodejs /simple-page
+WORKDIR /simple-page
+RUN npm install --production --unsafe-perm && \
+    npm dedupe 
+
+####### Below is for building image ########
+FROM node:14.17.5-alpine3.14
+# from crooked base image instead
+
+# Arguments for use in image build
+ARG USER=simple
+ARG UID=1001
+ARG GID=1001
+
+WORKDIR /simple-page
+
+RUN addgroup --system --gid ${GID} ${USER} && \
+    adduser ${USER} --system --uid ${UID} --ingroup ${USER}
+
+COPY --from=installer --chown=${USER} /simple-page .
+
+# copy in malware to test scanner
+# eicar file from web with curl
+# ioc file from fbi site
+# rsa keys as plain secrets
+
+# add in nc if not in base image -> use crooked base image
+# run chmod nc executable for run user
+# add copy in script to run as CMD below, running detached nc pipe first
+
+# Remove any setuid or setgid bits from files to avoid permission elevation
+RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+USER ${UID}
+EXPOSE 8080
+CMD ["npm", "start"]
+# cmd script from above instead

@@ -1,0 +1,137 @@
+prepare base image:
+## updated 30-03-25
+
+## build base image:
+# docker can be used instead of podman
+# in first terminal, go to lis directory and run:
+podman run -it --entrypoint=/bin/sh registry.access.redhat.com/ubi9/ubi-minimal:latest 
+# (9.5-1742914212)
+microdnf upgrade -y
+microdnf install -y iputils iproute net-tools bind-utils wget jq nmap-ncat procps findutils tar gzip
+mv /usr/bin/ncat /usr/bin/web
+
+# in new terminal
+podman ps
+# increment version in tag as needed
+podman commit <container_id> rs-test:base.5
+# in first terminal
+exit running container
+podman rm -af
+
+## test new image
+# increment version in tag as needed
+podman run -it --entrypoint=/bin/sh localhost/rs-test:base.5
+# test that all tools are installed and working, then
+exit running container
+
+## build listener image:
+# build listener from dockerfile and test
+# increment version in tag as needed
+podman build .
+podman images 
+podman tag <image_id> rs-test:lis.5
+
+## build application base image:
+# go to app directory (holds Dockerfile, scripty.sh and nodejs subdirectory for app) and run:
+# increment version in tag as needed
+podman run -it --entrypoint=/bin/sh localhost/rs-test:base.5
+microdnf upgrade -y
+# microdnf module enable nodejs:20
+# check if later version available and test it, then use it
+microdnf module enable nodejs:22
+# microdnf install -y iputils iproute net-tools bind-utils wget jq nmap-ncat procps findutils tar gzip nodejs
+microdnf install -y nodejs
+# mv /usr/bin/ncat /usr/bin/web
+
+# in new terminal
+podman ps
+podman commit <container_id> rs-test:base.app.5
+
+# in first terminal
+exit running container
+podman rm -af
+
+## test new image
+podman run -it --entrypoint=/bin/sh localhost/rs-test:base.app.5
+# test that all tools are installed and working, then
+exit running container
+
+## build application image:
+# build application base from dockerfile and test
+# increment version in tag as needed
+# node.js.20-minimal requires RHEL hence building this way ...
+# node.js.22-minimal requires RHEL hence building this way ...
+# (9.5-1742929466)
+# review package.json and test if newer dependencies can be used to reduce vulns ...
+# build application from dockerfile and test
+podman build .
+podman images 
+podman tag <image_id> rs-test:app.5
+
+## test new image
+curl http://<container-ip>:8080/nodejs
+
+## tag and push all 4 images to registry
+# podman tag <image> quay.io/mmurhamm/<image>
+# podman push quay.io/mmurhamm/<image>
+podman tag <image> harbor.localdomain/mytest/<image>
+podman push harbor.localdomain/mytest/<image>
+
+========================================================
+
+## for malware testing, go to directory mw-test and build container from Dockerfile
+# or run quay.io/mmurhamm/mw-test:4
+# or run harbor.localdomain/mytest/mw-test:4
+# !!! use container ImagePullPolicy: Always if you make updates to image !!!
+# shell into container
+cd /tmp/xmrig
+xmrig --help
+# (will not run cryptominer due to wrong version of gcc, but should trigger an alert in runtime security tools ...)
+
+
+==============================================================================================
+
+# test that all tools are installed and working:
+
+find - ok in nodejs, needed in Dockerfile (both)
+web - needed in scripty.sh (app) and Dockerfile (lis)
+dig - needed in scripty.sh
+awk - ok - needed in scripty.sh
+mknod - ok - needed in scripty.sh
+whoami - ok - 1001 in nodejs
+id - ok - 1001 in nodejs
+netstat
+ping
+ps
+ip
+cat - ok
+mkdir - ok
+wget
+npm - only in app
+curl - ok
+tar - ok in nodejs
+gzip
+
+========================================================
+
+The "docker commit" method means that if you run "docker inspect <image>" you don't see the following:
+
+"created_by": "/bin/sh -c yum install -y iputils iproute net-tools bind-utils wget jq nmap-ncat procps \u0026\u0026     mv /usr/bin/ncat /usr/bin/web \u0026\u0026     dnf -y module install nodejs:14",
+                "comment": "FROM registry.access.redhat.com/ubi8:8.6-754.1655117782"
+
+Which you do see if you inspect the image created by the Dockerfile below.
+
+========================================================
+
+Below is proposed Dockerfile config:
+
+####### Below to create a crooked image #####
+FROM registry.access.redhat.com/ubi8:8.6-754.1655117782
+# save the image as: <registry>/redhat-ubi8:mwm#
+
+RUN yum install -y iputils iproute net-tools bind-utils wget jq nmap-ncat procps && \
+    mv /usr/bin/ncat /usr/bin/web && \
+    dnf -y module install nodejs:14
+
+(could use registry.access.redhat.com/ubi8/nodejs-16-minimal:1-48 for nodejs but see user limit below)
+

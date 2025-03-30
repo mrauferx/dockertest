@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mw-test
+  labels:
+    app: mw-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mw-test
+  template:
+    metadata:
+      labels:
+        app: mw-test
+    spec:
+      containers:
+      - name: mw-test
+        image: harbor.localdomain/mytest/mw-test:4
+        imagePullPolicy: IfNotPresent
+      imagePullSecrets:
+      - name: harbor

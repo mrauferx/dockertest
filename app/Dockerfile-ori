@@ -1,0 +1,29 @@
+####### This is a multi-stage build ######
+####### Below is for building app ########
+FROM node:12.22.6 as installer
+COPY ./nodejs /simple-page
+WORKDIR /simple-page
+RUN npm install --production --unsafe-perm && \
+    npm dedupe 
+
+####### Below is for building image ########
+FROM node:12.22.6-alpine3.13
+
+# Arguments for use in image build
+ARG USER=simple
+ARG UID=1001
+ARG GID=1001
+
+WORKDIR /simple-page
+
+RUN addgroup --system --gid ${GID} ${USER} && \
+    adduser ${USER} --system --uid ${UID} --ingroup ${USER}
+
+COPY --from=installer --chown=${USER} /simple-page .
+
+# Remove any setuid or setgid bits from files to avoid permission elevation
+RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+
+USER ${UID}
+EXPOSE 8080
+CMD ["npm", "start"]

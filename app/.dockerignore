@@ -1,0 +1,4 @@
+.git/
+Dockerfile-ori
+Dockerfile-test.txt
+.npmrc
